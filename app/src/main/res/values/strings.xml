@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">TetheringService</string>
+    <string name="accessibility_service_description">mertdesc</string>
+</resources>
