@@ -8,6 +8,12 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
@@ -16,6 +22,28 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        //clear service state
+        AccessibilityServiceHelper.clearServiceState(this, "UsbTethering")
+        AccessibilityServiceHelper.clearServiceState(this, "ProxyServer")
+        AccessibilityServiceHelper.clearServiceState(this, "HttpInjector")
+
+        // PeriodicWorker'ı başlat
+        AccessibilityServiceHelper.scheduleJob(this)
+//        val constraints = Constraints.Builder()
+//            .setRequiredNetworkType(NetworkType.CONNECTED)
+//            .setRequiresCharging(true)
+//            .build()
+//
+//        val periodicWorkRequest = PeriodicWorkRequestBuilder<PeriodicWorker>(2, TimeUnit.MINUTES)
+//            .setConstraints(constraints)
+//            .build()
+//        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+//            "PeriodicWorker", // Unique iş ismi
+//            ExistingPeriodicWorkPolicy.KEEP, // Var olan işi koru, yeni iş başlatma
+//            periodicWorkRequest
+//        )
+
+        //launch accesibility settings
         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
 //        val intent = Intent()
 //        intent.setClassName("com.android.settings", "com.android.settings.SubSettings}")

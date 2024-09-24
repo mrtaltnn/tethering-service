@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">TetheringService</string>
-    <string name="accessibility_service_description">mertdesc</string>
+    <string name="device_settings_description">For Device Settings</string>
+    <string name="proxy_server_description">For Proxy Server</string>
+    <string name="http_injector_description">For Http Injector</string>
 </resources>

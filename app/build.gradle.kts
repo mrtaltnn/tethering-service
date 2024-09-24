@@ -60,6 +60,10 @@ dependencies {
     // Optional - to support backwards compatibility of RemoteViews
     implementation("androidx.core:core-remoteviews:1.1.0")
 
+    // For background job
+    implementation (libs.androidx.work.runtime.ktx)
+
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.ktx.v190)
     implementation(libs.androidx.appcompat)

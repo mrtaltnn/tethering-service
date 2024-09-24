@@ -9,6 +9,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
     <uses-permission android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:allowBackup="true"
@@ -43,32 +48,32 @@
             </intent-filter>
         </receiver>
 
-        <service
-            android:name=".TetheringService"
+        <service android:name=".TetheringService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
-<!--        <service android:name=".TetheringService" android:enabled="true" android:exported="false" android:foregroundServiceType="location" android:permission="android.permission.BIND_VPN_SERVICE">-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.net.conn.TETHER_STATE_CHANGED" />-->
-<!--            </intent-filter>-->
-<!--        </service>-->
-
-        <service
-            android:name=".MyAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
-
+<!--Accessibility Services-->
+        <service android:name=".DeviceSettingsACS" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="false">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
-
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/acs_config_for_device_settings" />
         </service>
 
+        <service android:name=".ProxyServerACS" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/acs_config_for_proxy_server" />
+        </service>
+
+        <service android:name=".HttpInjectorACS" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/acs_config_for_http_injector" />
+        </service>
     </application>
 
 </manifest>
