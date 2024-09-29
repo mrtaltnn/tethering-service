@@ -23,12 +23,8 @@ class TetheringService : Service() {
     }
 
     private fun enableUsbTethering() {
-        try {
-//            val usbTethering = Settings.Global.getInt(contentResolver, "tethering_on")
-//            if (usbTethering == 0) {
-//                Settings.Global.putInt(contentResolver, "tethering_on", 1)
-//                Log.d("mert UsbTetheringService", "USB Tethering enabled")
-//            }
+        try
+        {
             val tetherIntent = Intent()
             tetherIntent.setClassName("com.android.settings", "com.android.settings.Settings\$TetherSettingsActivity")
             tetherIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK

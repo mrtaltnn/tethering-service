@@ -1,6 +1,8 @@
 package com.mertaltun.tetheringservice
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.util.Log
@@ -22,56 +24,62 @@ class DeviceSettingsACS : AccessibilityService() {
 
             rootNode?.let {
                 if (!isUsbTetheringActive) {
-                    performTetheringSwitchToggle(it)
+                    handleUsbTethering(it)
                 }
                 else {
-                    airplaneModeToggle(it)
+                    handleAirplaneMode(it)
                 }
             }
         }
     }
 
     private fun airplaneModeToggle(node: AccessibilityNodeInfo) {
-        Log.d("AccessibilityService", "airplaneModeToggle")
-        //val isHaveAirplaneMode  = node.findAccessibilityNodeInfosByText("Uçak modu").firstOrNull()
+        Log.d("AccessibilityService", "airplaneModeToggle operations")
 
         val switches = mutableListOf<AccessibilityNodeInfo>()
-        //findSwitchesRecursively(node, switches)
         UiHelper.findSwitchesRecursively(node, switches)
         Log.d("AccessibilityService", "Switches found: ${node.childCount} ${switches.size}")
 
         if (switches.size == 1) {
             val airplaneModeSwitch = switches[0]
             Log.d("AccessibilityService", "Switch found: ${airplaneModeSwitch.isChecked} ${airplaneModeSwitch.isClickable}")
+
+//            if (!AccessibilityServiceHelper.isAirplaneModeOn(this)) {
             if (airplaneModeSwitch.isClickable && !airplaneModeSwitch.isChecked) {
-                //Uçak modu açık değilse aç
                 airplaneModeSwitch.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                AccessibilityServiceHelper.setServiceActive(this, "AirplaneMode", true)
-                Thread.sleep(2000)
+                Thread.sleep(3000)
             }
 
-            if(airplaneModeSwitch.isClickable && !airplaneModeSwitch.isChecked)
+            if(AccessibilityServiceHelper.isAirplaneModeOn(this))
             {
-                //Uçak modu açıksa kapat
                 airplaneModeSwitch.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                AccessibilityServiceHelper.setServiceActive(this, "AirplaneMode", false)
-                Thread.sleep(2000)
+                Thread.sleep(5000)
             }
 
-            //start http injector app
-            AccessibilityServiceHelper.launchApp(this, "com.evozi.injector")
+            val isHttpInjectorCaller = AccessibilityServiceHelper.isServiceActive(this, "HttpInjector-caller")
+            val isCellularAvailable = AccessibilityServiceHelper.checkCellularConnection(this)
+
+            if(isCellularAvailable)
+            {
+                //start http injector app
+                AccessibilityServiceHelper.launchApp(this, "com.evozi.injector","DeviceSettings")
+            }
+            else
+            {
+                Log.d("AccessibilityService", "HttpInjectorCaller: $isHttpInjectorCaller, CellularAvailable: $isCellularAvailable")
+                performGlobalAction(GLOBAL_ACTION_HOME)
+            }
         }
     }
 
-    private fun performTetheringSwitchToggle(node: AccessibilityNodeInfo) {
-        Log.d("AccessibilityService", "performTetheringSwitchToggle")
+    private fun handleUsbTethering2(node: AccessibilityNodeInfo) {
+        Log.d("AccessibilityService", "handleUsbTethering")
         val switches = mutableListOf<AccessibilityNodeInfo>()
-            //findSwitchesRecursively(node, switches)
         UiHelper.findSwitchesRecursively(node, switches)
         Log.d("AccessibilityService", "Switches found: ${node.childCount} ${switches.size}")
 
         if (switches.size == 2 && node.childCount==1) {
-            //val usbTetheringSwitch = switches[1]
+//            val usbTetheringSwitch = switches[1]
             val usbTetheringSwitch = switches[0]
             Log.d("AccessibilityService", "Switch found: ${usbTetheringSwitch.isChecked} ${usbTetheringSwitch.isClickable}")
             if (usbTetheringSwitch.isClickable && !usbTetheringSwitch.isChecked) {
@@ -85,8 +93,53 @@ class DeviceSettingsACS : AccessibilityService() {
 
             AccessibilityServiceHelper.setServiceActive(this, "UsbTethering", true)
             //start proxy app
-            AccessibilityServiceHelper.launchApp(this, "com.gorillasoftware.everyproxy")
+            AccessibilityServiceHelper.launchApp(this, "com.gorillasoftware.everyproxy","DeviceSettings")
         }
+    }
+
+    private fun handleUsbTethering(node: AccessibilityNodeInfo) {
+        Log.d("AccessibilityService", "handleUsbTethering")
+
+//        val usbTetheringSwitch = UiHelper.findSwitchAtIndex(node, 1,2)
+        val usbTetheringSwitch = UiHelper.findSwitchAtIndex(node, 0,2)
+
+        usbTetheringSwitch?.let {
+            Log.d("AccessibilityService", "Switch found: ${usbTetheringSwitch.isChecked} ${usbTetheringSwitch.isClickable}")
+            if (usbTetheringSwitch.isClickable && !usbTetheringSwitch.isChecked) {
+                usbTetheringSwitch.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                Thread.sleep(2000)
+            }
+            else
+            {
+                Log.d("AccessibilityService", "Switch is not clickable or already checked")
+            }
+
+            AccessibilityServiceHelper.setServiceActive(this, "UsbTethering", true)
+            //start proxy app
+            AccessibilityServiceHelper.launchApp(this, "com.gorillasoftware.everyproxy","DeviceSettings")
+        }
+    }
+
+    private fun handleAirplaneMode(node: AccessibilityNodeInfo) {
+            val airplaneModeSwitch = UiHelper.findSwitchAtIndex(node, 0,1)
+            airplaneModeSwitch?.let {
+                if (it.isChecked) {
+                    // Uçak modu açıksa kapat
+                    Thread.sleep(2000)
+                    it.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    Thread.sleep(3000)
+                    AccessibilityServiceHelper.launchApp(this, "com.evozi.injector","DeviceSettings")
+                }
+                else {
+                    // Uçak modu kapalıysa aç, 3 saniye bekle ve tekrar kapat
+                    it.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        it.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        Thread.sleep(3000)
+                        AccessibilityServiceHelper.launchApp(this, "com.evozi.injector","DeviceSettings")
+                    }, 3000)
+                }
+            }
     }
 
     override fun onInterrupt() {

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.core.content.ContextCompat
 
 class UsbConnectionReceiver : BroadcastReceiver() {
@@ -15,21 +16,18 @@ class UsbConnectionReceiver : BroadcastReceiver() {
         AccessibilityServiceHelper.clearServiceState(context, "ProxyServer")
         AccessibilityServiceHelper.clearServiceState(context, "HttpInjector")
 
-        val usbConnected = intent.getBooleanExtra("connected", false)
+        Thread.sleep(3000)
+//        val usbConnected = intent.getBooleanExtra("connected", false)
+        val isCellularAvailable = AccessibilityServiceHelper.checkCellularConnection(context)
 
-        if(usbConnected)
+        if(isCellularAvailable)
         {
             //launch tether settings
-            AccessibilityServiceHelper.launchTetherSettings(context)
+            AccessibilityServiceHelper.launchTetherSettings(context,"UsbConnectionReceiver")
         }
-
-//        if (usbConnected) {
-//            val serviceIntent = Intent(context, TetheringService::class.java)
-//            ContextCompat.startForegroundService(context, serviceIntent)
-//
-//        } else {
-//            val stopIntent = Intent(context, TetheringService::class.java)
-//            context.stopService(stopIntent)
-//        }
+        else{
+            //TODO bunun ACS si yok
+            AccessibilityServiceHelper.launchMobileDataSettings(context, "UsbConnectionReceiver")
+        }
     }
 }

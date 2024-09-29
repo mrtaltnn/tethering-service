@@ -12,8 +12,12 @@ import java.util.concurrent.TimeUnit
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.core.app.NotificationCompat
 import android.os.Build
+import android.util.Log
 
 
 object AccessibilityServiceHelper {
@@ -39,7 +43,25 @@ object AccessibilityServiceHelper {
         editor.apply()
     }
 
-    fun launchApp(context: Context, packageName: String) {
+    fun clearCallerState(context: Context, caller: String) {
+        val editor = getPreferences(context).edit()
+        editor.remove("$caller-caller")
+        editor.apply()
+    }
+
+    fun clearAllCallerState(context: Context) {
+        clearServiceState(context, "BootReceiver-caller")
+        clearServiceState(context, "UsbConnectionReceiver-caller")
+        clearServiceState(context, "HttpInjector-caller")
+        clearServiceState(context, "DeviceSettings-caller")
+        clearServiceState(context, "PeriodicWorker-caller")
+        clearServiceState(context, "ProxyServer-caller")
+        clearServiceState(context, "MainActivity-caller")
+    }
+
+    fun launchApp(context: Context, packageName: String,caller: String) {
+        clearAllCallerState(context)
+        setServiceActive(context,"$caller-caller", true)
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
         launchIntent?.let {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -47,22 +69,34 @@ object AccessibilityServiceHelper {
         }
     }
 
-    fun launchAirplaneModeSettings(context: Context) {
+    fun launchAirplaneModeSettings(context: Context,caller: String) {
+        clearAllCallerState(context)
+        setServiceActive(context,"$caller-caller", true)
         val intent = Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(context, intent, null)
     }
 
-    fun launchTetherSettings(context: Context) {
+    fun launchTetherSettings(context: Context, caller: String) {
+        clearAllCallerState(context)
+        setServiceActive(context,"$caller-caller", true)
         val tetherIntent = Intent()
         tetherIntent.setClassName("com.android.settings", "com.android.settings.Settings\$TetherSettingsActivity")
         tetherIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         startActivity(context, tetherIntent, null)
     }
 
+    fun launchMobileDataSettings(context: Context, caller: String) {
+        clearAllCallerState(context)
+        setServiceActive(context,"$caller-caller", true)
+        val intent = Intent()
+        intent.setClassName("com.android.phone", "com.android.phone.MSimMobileNetworkSettings")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(context,intent,null)
+    }
+
     fun scheduleJob(context: Context) {
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
             .setRequiresBatteryNotLow(true)
             .setRequiresCharging(true)
             .build()
@@ -76,6 +110,55 @@ object AccessibilityServiceHelper {
         ExistingPeriodicWorkPolicy.KEEP,
         request
         )
+    }
+
+    fun isCellularAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val activeNetwork = connectivityManager.activeNetwork
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+
+            return networkCapabilities != null && (
+//                    networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                            networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+                    )
+    }
+
+    fun checkCellularConnection(context: Context): Boolean {
+        var attempts = 0
+        val maxAttempts = 5
+        var isCellularAvailable = false
+        while (attempts < maxAttempts) {
+            attempts++
+            if (isCellularAvailable(context)) {
+                Log.d("CellularCheck", "Hücresel veri aktif!")
+                isCellularAvailable= true
+                break
+            } else {
+                Log.d("CellularCheck", "Hücresel veri aktif değil, tekrar deneme yapılıyor...")
+            }
+
+            Thread.sleep(2000) // 2 saniye bekle
+        }
+
+        if (attempts == maxAttempts) {
+            Log.d("CellularCheck", "Hücresel veri aktif değil, maksimum deneme sayısına ulaşıldı.")
+        }
+        return isCellularAvailable
+    }
+
+    fun isAirplaneModeOn(context: Context): Boolean {
+        return Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+    }
+
+    fun checkUsbConnection(context: Context): Boolean {
+        val intentFilter = IntentFilter(Intent.ACTION_UMS_CONNECTED)
+        val usbStateIntent = context.registerReceiver(null, intentFilter)
+        return usbStateIntent != null
+    }
+
+    fun checkUsbConnection2(context: Context): Boolean {
+        val intent = context.registerReceiver(null, IntentFilter("android.hardware.usb.action.USB_STATE"))
+        return intent?.getBooleanExtra("connected", false) ?: false
     }
 }
 
@@ -93,56 +176,75 @@ object UiHelper {
         }
     }
 
-    fun findButtonNode(text: String, node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        if (node.text != null && node.text.toString().contains(text)) {
-            return node
+    fun findSwitchAtIndex(node: AccessibilityNodeInfo, index: Int,expectedCount: Int): AccessibilityNodeInfo? {
+        val switches = mutableListOf<AccessibilityNodeInfo>()
+        findSwitchesRecursively(node, switches)
+        return if (switches.size == expectedCount && index in switches.indices) {
+            switches[index]
+        } else {
+            null
+        }
+    }
+
+    fun findButtonNode(node: AccessibilityNodeInfo,name:String): AccessibilityNodeInfo? {
+        return node.findAccessibilityNodeInfosByText(name)?.firstOrNull()
+    }
+
+    fun getAllTextViewsText(rootNode: AccessibilityNodeInfo?): List<String> {
+        val texts = mutableListOf<String>()
+        rootNode?.let {
+            collectTextViewsText(it, texts)
+        }
+        return texts
+    }
+
+    private fun collectTextViewsText(node: AccessibilityNodeInfo, texts: MutableList<String>) {
+        if (node.className == "android.widget.TextView" && !node.text.isNullOrEmpty() && node.text.toString().startsWith("[")) {
+            texts.add(node.text.toString())
         }
 
+        // Alt node'larda arama yap
         for (i in 0 until node.childCount) {
-            val foundNode = findButtonNode(text, node.getChild(i))
-            if (foundNode != null) {
-                return foundNode
+            val childNode = node.getChild(i)
+            if (childNode != null) {
+                collectTextViewsText(childNode, texts)
             }
         }
-        return null
+    }
+
+    fun refreshCurrentScreen(context: Context) {
+        val intent = Intent(context, HttpInjectorACS::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 }
 
 // ACS lerin arkaplanda da çalışabilmesi için
 
 object ForegroundServiceHelper {
-
     private const val NOTIFICATION_CHANNEL_ID = "accessibility_service_channel"
     private const val NOTIFICATION_ID = 1
 
     fun startForegroundService(context: Context) {
-        // Android 8.0 (API 26) ve üzeri için Notification Channel oluşturma
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NOTIFICATION_CHANNEL_ID,
-                "Accessibility Service Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            val notificationManager =
-                context.getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
-        }
+        val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID,
+            "Accessibility Service Channel",
+            NotificationManager.IMPORTANCE_DEFAULT)
 
-        // Foreground Service için bir Notification oluşturma
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(channel)
+
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("Foreground Service Running")
-            .setContentText("Accessibility Service is running in the background.")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Tethering Service is running")
+            .setContentText("All operations are working...")
+            .setSmallIcon(android.R.drawable.presence_online)
             .build()
 
-        // Foreground Service başlatma
         if (context is AccessibilityService) {
             context.startForeground(NOTIFICATION_ID, notification)
         }
     }
 
     fun stopForegroundService(context: Context) {
-        // Foreground Service'i durdurma
         if (context is AccessibilityService) {
             context.stopForeground(true)
         }

@@ -5,7 +5,6 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.util.Log
 
-
 class ProxyServerACS : AccessibilityService() {
 
     private val targetPackageName = "com.gorillasoftware.everyproxy"
@@ -19,7 +18,7 @@ class ProxyServerACS : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val isProxyActive = AccessibilityServiceHelper.isServiceActive(this, "ProxyServer")
         if (isProxyActive) {
-            AccessibilityServiceHelper.launchAirplaneModeSettings(this)
+            AccessibilityServiceHelper.launchAirplaneModeSettings(this, "ProxyServer")
         }
         else
         {
@@ -54,8 +53,8 @@ class ProxyServerACS : AccessibilityService() {
             Log.d("ProxyServerACS", "Switch is not clickable or already checked")
             AccessibilityServiceHelper.setServiceActive(this, "ProxyServer", true)
 
-            //launch airplane mode settings
-            AccessibilityServiceHelper.launchAirplaneModeSettings(this)
+            //launch injector
+            AccessibilityServiceHelper.launchApp(this, "com.evozi.injector","ProxyServer")
         }
     }
 

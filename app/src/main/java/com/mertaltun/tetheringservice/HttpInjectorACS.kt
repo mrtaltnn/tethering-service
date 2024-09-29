@@ -2,15 +2,12 @@ package com.mertaltun.tetheringservice
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
-import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import kotlin.concurrent.thread
 
 class HttpInjectorACS : AccessibilityService() {
 
-    private val targetPackageName = "com.evozi.injector"
     private var rootNode: AccessibilityNodeInfo? = null
 
     override fun onServiceConnected() {
@@ -19,20 +16,96 @@ class HttpInjectorACS : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        val isInjectorActive = AccessibilityServiceHelper.isServiceActive(this, "HttpInjector")
-        if (isInjectorActive) {
-            return
-        }
-        event?.let {
-            if (event.packageName == targetPackageName) {
-                if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            event?.let {
                     rootNode = rootInActiveWindow
-                }
-
-                rootNode?.let {
-                    findAndClickButtons(it)
+                    rootNode?.let {
+                        checkAndRunHttpInjector(it)
+                    }
                 }
             }
+
+    private fun checkAndRunHttpInjector(node: AccessibilityNodeInfo) {
+        Log.d("HttpInjectorACS", "checkAndRunHttpInjector operations")
+
+        val lastLogs = UiHelper.getAllTextViewsText(node).takeLast(2)
+        Log.d("HttpInjectorACS", "Last logs: $lastLogs")
+        val isVpnConnectionPresent = lastLogs.any { it.contains("[VPN] Bağlandı") }
+
+        if (isVpnConnectionPresent) {
+            Log.d("HttpInjectorACS", "VPN connected, no problem")
+            AccessibilityServiceHelper.setServiceActive(this,"HttpInjector", true)
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+        else
+        {
+            Log.d("HttpInjectorACS", "VPN not connected, trying reconnection")
+            AccessibilityServiceHelper.setServiceActive(this,"HttpInjector", false)
+            activateHttpInjector(node)
+        }
+    }
+
+    private fun activateHttpInjector(node: AccessibilityNodeInfo) {
+        Log.d("HttpInjectorACS", "HttpInjector operations")
+        val isPeriodicWorkerCaller = AccessibilityServiceHelper.isServiceActive(this, "PeriodicWorker-caller")
+        if(isPeriodicWorkerCaller){
+            AccessibilityServiceHelper.clearAllCallerState(this)
+            goToMain()
+        }
+
+        //Çalışıyosa önce bi durduralım
+        stopHttpInjector(node)
+
+        //uçak modundan gelmemişsek uçak moduna gidip aç kapa yapalım, yoksa başlatalım
+        val isDeviceSettingsCaller = AccessibilityServiceHelper.isServiceActive(this, "DeviceSettings-caller")
+        val isAirplaneModeon = AccessibilityServiceHelper.isAirplaneModeOn(this)
+
+        if(!isDeviceSettingsCaller || isAirplaneModeon)
+        {
+            Thread.sleep(2000)
+            AccessibilityServiceHelper.launchAirplaneModeSettings(this, "HttpInjector")
+        }
+        else
+        {
+            val isCellularAvailable = AccessibilityServiceHelper.checkCellularConnection(this)
+            if(!isCellularAvailable)
+            {
+                //TODO bunun ACS si yok
+                AccessibilityServiceHelper.launchMobileDataSettings(this, "HttpInjector")
+            }
+            AccessibilityServiceHelper.setServiceActive(this,"DeviceSettings-caller", false)
+            startHttpInjector(node)
+            Thread.sleep(2000)
+            goToMain()
+//            checkAndRunHttpInjector(node)
+//            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+    }
+
+    private fun goToMain() {
+        Thread.sleep(3000)
+        val intent = Intent(this, MainActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.putExtra("HttpInjector", true)
+        startActivity(intent)
+    }
+
+    private fun startHttpInjector(node: AccessibilityNodeInfo) {
+        val startButton = UiHelper.findButtonNode(node, "Başlat")
+        if (startButton != null && startButton.isClickable) {
+            startButton.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            Thread.sleep(2000)
+            AccessibilityServiceHelper.setServiceActive(this, "HttpInjector", true)
+            Log.d("HttpInjectorACS", "HttpInjector started")
+        }
+    }
+
+    private fun stopHttpInjector(node: AccessibilityNodeInfo) {
+        val stopButton = UiHelper.findButtonNode(node, "Dur")
+        if (stopButton != null && stopButton.isClickable) {
+            stopButton.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            Thread.sleep(2000)
+            AccessibilityServiceHelper.setServiceActive(this, "HttpInjector", false)
+            Log.d("HttpInjectorACS", "HttpInjector stopped")
         }
     }
 
@@ -41,43 +114,8 @@ class HttpInjectorACS : AccessibilityService() {
         stopSelf()
     }
 
-
     override fun onDestroy() {
         super.onDestroy()
         ForegroundServiceHelper.stopForegroundService(this)
-    }
-
-    private fun findAndClickButtons(node: AccessibilityNodeInfo) {
-            val startButton=findButtonNode("Başlat")
-            val stopButton=findButtonNode("Dur")
-
-            if (startButton != null && startButton.isClickable) {
-                startButton.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Thread.sleep(2000)
-                AccessibilityServiceHelper.setServiceActive(this, "HttpInjector", true)
-            }
-            else if (stopButton != null && stopButton.isClickable) {
-                stopButton.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                Thread.sleep(2000)
-                AccessibilityServiceHelper.setServiceActive(this, "HttpInjector", false)
-            }
-            else {
-                Log.d("HttpInjectorACS", "Button is not clickable")
-            }
-    }
-
-    private fun findButtonsRecursively(node: AccessibilityNodeInfo, buttons: MutableList<AccessibilityNodeInfo>) {
-        if (node.className == "android.widget.Button") {
-            buttons.add(node)
-        } else {
-            for (i in 0 until node.childCount) {
-                findButtonsRecursively(node.getChild(i), buttons)
-            }
-        }
-    }
-
-    private fun findButtonNode(name:String): AccessibilityNodeInfo? {
-        val rootNode = rootInActiveWindow ?: return null
-        return rootNode.findAccessibilityNodeInfosByText(name)?.firstOrNull()
     }
 }
