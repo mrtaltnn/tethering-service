@@ -1,8 +1,6 @@
 package com.mertaltun.tetheringservice
 
-import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -10,17 +8,10 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.os.PowerManager.*
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import android.util.Log
-import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 class PeriodicWorker(context: Context, workerParams: WorkerParameters): Worker(context, workerParams) {
 

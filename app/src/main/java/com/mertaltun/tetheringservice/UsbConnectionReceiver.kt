@@ -4,8 +4,6 @@ import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
-import androidx.core.content.ContextCompat
 
 class UsbConnectionReceiver : BroadcastReceiver() {
 
@@ -17,7 +15,6 @@ class UsbConnectionReceiver : BroadcastReceiver() {
         AccessibilityServiceHelper.clearServiceState(context, "HttpInjector")
 
         Thread.sleep(3000)
-//        val usbConnected = intent.getBooleanExtra("connected", false)
         val isCellularAvailable = AccessibilityServiceHelper.checkCellularConnection(context)
 
         if(isCellularAvailable)
